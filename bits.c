@@ -189,7 +189,7 @@ int anyEvenBit(int x) {
   val = val | val >> 8;
   val = val | val >> 4;
   val = val | val >> 2;
-  return !(val & 0x1);
+  return (val & 0x1);
 }
 /* 
  * divpwr2 - Compute x/(2^n), for 0 <= n <= 30
@@ -198,15 +198,13 @@ int anyEvenBit(int x) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 15
  *   Rating: 2
- *   Done!
  */
 int divpwr2(int x, int n) {
   int val = x >> n;
   int valCalced = val << n;
   int diff = !!(x ^ valCalced);
   int signVal = (x >> 31) & 0x1;
-  int leastBit = x & 0x1;
-  val = val + (signVal & diff);//(leastBit & signVal & (!!n));
+  val = val + (signVal & diff);
   return val;
 }
 /* 
@@ -216,10 +214,11 @@ int divpwr2(int x, int n) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 8
  *   Rating: 1
- *   DO THIS!!!
  */
 int fitsShort(int x) {
-  return 2;
+  int val = x >> 15;
+  int diff = ((val ^ x) >> 15);
+  return !diff;
 }
 /* 
  * float_half - Return bit-level equivalent of expression 0.5*f for
@@ -231,10 +230,26 @@ int fitsShort(int x) {
  *   Legal ops: Any integer/unsigned operations incl. ||, &&. also if, while
  *   Max ops: 30
  *   Rating: 4
- *   DO THIS!!!
  */
 unsigned float_half(unsigned uf) {
-  return 2;
+  //Since we have a base 2 exponent, dividing by 2 would be simply subtracting one from the exponent value. 
+  unsigned sign = uf & 0x80000000;
+  unsigned leastBit = uf & 0x3;
+  unsigned exponent = (uf & 0x7FFFFFFF) >> 23;
+  unsigned frac = uf & 0x7FFFFF;
+  leastBit = leastBit & (leastBit >> 1);
+  if(exponent == 0xFF){
+    return uf;
+  }
+  if(exponent == 0x0){
+    return sign + (frac >> 1) + leastBit;
+  }
+  if(exponent == 0x1){
+    frac = (exponent << 22) + (frac >> 1);
+    return sign + frac + leastBit;
+  }
+  exponent = exponent + (0xFFFFFFFF);
+  return sign + (exponent << 23) + frac;
 }
 /* 
  * float_i2f - Return bit-level equivalent of expression (float) x
@@ -260,19 +275,16 @@ unsigned float_i2f(int x) {
  *   Rating: 2
  */
 unsigned float_neg(unsigned uf) {
-  /*unsigned val = 0;
-  unsigned sign = uf >> 31;
-  if(sign){
-    val = 0x7F;
-    val = (val << 8) + 0xFF;
-    val = (val << 8) + 0xFF;
-    val = (val << 8) + 0xFF;
-    val = uf & val;
+  int exponent = (uf << 1) >> 24;
+  int mantissa = uf << 9;
+  if ((exponent == 0xFF) && (mantissa != 0x00)){
+    return uf;
   }
-  if(!(sign)){
-    val = val << 31;
-    val = val + uf;
-  }*/
+  else{
+    int test = (0x8)<<28;
+    test = test ^ uf;
+    return test;
+  }
   return 2;
 }
 /*
@@ -281,10 +293,15 @@ unsigned float_neg(unsigned uf) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 90
  *   Rating: 4
- *   DO THIS!!!
  */
 int ilog2(int x) {
-  return 2;
+  //Ignore first bit, it'll never be used.
+  int bit1 = (((!!(x >> 16)) << 31) >> 32) & 16; //When a val is greater than half of max, bit1 is 0xFFFFFFFF. Otherwise, it's 0x0.
+  int bit2 = (((!!(x >> (bit1 + 8))) << 31) >> 31) & 8; //When a val is greater than half of max, bit1 is 0xFFFFFFFF. Otherwise, it's 0x0.
+  int bit3 = (((!!(x >> (bit1 + bit2 + 4))) << 31) >> 31) & 4; //When a val is greater than either 
+  int bit4 = (((!!(x >> (bit1 + bit2 + bit3 + 2))) << 31) >> 31) & 2; //When a val is greater than either 
+  int bit5 = (((!!(x >> (bit1 + bit2 + bit3 + bit4 + 1))) << 31) >> 31) & 1; //When a val is greater than either
+  return bit1 + bit2 + bit3 + bit4 + bit5;
 }
 /* 
  * isNotEqual - return 0 if x == y, and 1 otherwise 
@@ -292,7 +309,6 @@ int ilog2(int x) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 6
  *   Rating: 2
- *   Done!
  */
 int isNotEqual(int x, int y) {
   int addedVals = ~x + y;
@@ -305,7 +321,6 @@ int isNotEqual(int x, int y) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 2
  *   Rating: 1
- *   Done!
  */
 int isZero(int x) {
   return !x;
@@ -331,10 +346,13 @@ int logicalNeg(int x) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 12
  *   Rating: 3
- *   DO THIS!!!
  */
 int multFiveEighths(int x) {
-  return 2;
+  int numerator = (x << 2) + x;
+  int frac = numerator >> 3;
+  int sign = (x >> 31);
+  int divByEight = !!(x & 0x7);
+  return frac + (sign & divByEight);
 }
 /* 
  * negate - return -x 
@@ -344,7 +362,9 @@ int multFiveEighths(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+  int minOne = x + (~0x0);
+  int neg = ~minOne;
+  return neg;
 }
 /* 
  * oddBits - return word with all odd-numbered bits set to 1
@@ -355,8 +375,7 @@ int negate(int x) {
 int oddBits(void) {
   int oddNum = 0xAA;
   oddNum = 0xAA + (oddNum << 8);
-  oddNum = 0xAA + (oddNum << 8);
-  oddNum = 0xAA + (oddNum << 8);
+  oddNum = oddNum + (oddNum << 16);
   return oddNum;
 }
 /* 
@@ -368,7 +387,29 @@ int oddBits(void) {
  *   Rating: 3
  */
 int rempwr2(int x, int n) {
-    return 2;
+    //Creates either a 1 or a 0 to be used when negating x
+    int sign = x >> 31;
+    int noExtra = sign & 1;
+
+    //To negate, you need to ~x. But if it's already positive, you don't want to do anything.
+    //So ^ with the sign does ~x only if it's negative.
+    int flipIfNeg = x ^ sign;
+
+    //To finish the negation, you take the ~x and add 1. But if positive, x will not have been
+    //changed and 0 will be added instead.
+    int absVal = flipIfNeg + noExtra;
+
+    //This is the script that will actually do the modulus.
+    int rem = absVal & ((0x1<<n) + (~0x0));
+
+    //If we made a negative number positive, then we need to make it negative again.
+    //Else, it needs to remain positive.
+    rem = (rem^sign) + noExtra;
+    
+    //printf("0x%x\n",x);
+    return rem;
+
+    //a mod 2i = a & (2i–1)
 }
 /* 
  * rotateRight - Rotate x to the right by n
@@ -377,12 +418,11 @@ int rempwr2(int x, int n) {
  *   Legal ops: ~ & ^ | + << >>
  *   Max ops: 25
  *   Rating: 3 
- *   Done!
  */
 int rotateRight(int x, int n) {
   int signVal = (x >> 31) & 0x1;
   int trunkMask = 0x1F;
-  int zeroMask = (((((0x7F << 8) + 0xFF) << 8) + 0xFF) << 8) + 0xFF;
+  int zeroMask = ~((0x1) << 31);
   int complement = (~(n & trunkMask));
   int valRotated = x << (complement + 1);
   int valShifted = ((x & zeroMask) >> n) | (signVal << complement);
@@ -422,11 +462,7 @@ int thirdBits(void) {
  *   Rating: 1
  */
 int tmin(void) {
-  int mostNeg = 0x80;
-  mostNeg = 0x00 + (mostNeg << 8);
-  mostNeg = 0x00 + (mostNeg << 8);
-  mostNeg = 0x00 + (mostNeg << 8);
-  return mostNeg;
+  return 0x1 << 31;
 }
 /*
  * trueThreeFourths - multiplies by 3/4 rounding toward 0,
@@ -437,9 +473,15 @@ int tmin(void) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 20
  *   Rating: 4
- *   DO THIS!!!
  */
 int trueThreeFourths(int x)
 {
-  return 2;
+  int frac = (x >> 2);
+  int rem = x & 0x3;
+  int sign = (x >> 31);
+  int divByFour = !!(x & 0x3);
+  frac = frac + (frac << 1);
+  rem = ((rem << 1) + rem) >> 2;
+  frac = rem + frac;
+  return frac + (sign & divByFour);
 }
